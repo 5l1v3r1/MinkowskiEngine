@@ -43,6 +43,15 @@ class SparseTensorOperationMode(Enum):
     SHARE_COORDS_MANAGER = 1
 
 
+class SparseTensorQuantizationMode(Enum):
+    """
+    RANDOM_SUBSAMPLE: Subsample one coordinate per each quantization block randomly.
+    UNWEIGHTED_AVERAGE: average all features within a quantization block equally.
+    """
+    RANDOM_SUBSAMPLE = 0
+    UNWEIGHTED_AVERAGE = 1
+
+
 _sparse_tensor_operation_mode = SparseTensorOperationMode.SEPARATE_COORDS_MANAGER
 _global_coords_man = None
 COORDS_MAN_DIFFERENT_ERROR = "SparseTensors must share the same coordinate manager for this operation. Please refer to the SparseTensor creation API (https://stanfordvl.github.io/MinkowskiEngine/sparse_tensor.html) to share the coordinate manager, or set the sparse tensor operation mode with `set_sparse_tensor_operation_mode` to share it by default."
@@ -51,7 +60,7 @@ COORDS_KEY_DIFFERENT_ERROR = "SparseTensors must have the same coords_key."
 
 def set_sparse_tensor_operation_mode(operation_mode: SparseTensorOperationMode):
     assert isinstance(operation_mode, SparseTensorOperationMode), \
-      f"Input must be an instance of SparseTensorOperationMode not {operation_mode}"
+        f"Input must be an instance of SparseTensorOperationMode not {operation_mode}"
     global _sparse_tensor_operation_mode
     _sparse_tensor_operation_mode = operation_mode
 
@@ -127,14 +136,16 @@ class SparseTensor():
 
     """
 
-    def __init__(self,
-                 feats,
-                 coords=None,
-                 coords_key=None,
-                 coords_manager=None,
-                 force_creation=False,
-                 allow_duplicate_coords=False,
-                 tensor_stride=1):
+    def __init__(
+            self,
+            feats,
+            coords=None,
+            coords_key=None,
+            coords_manager=None,
+            force_creation=False,
+            allow_duplicate_coords=False,
+            quantization_mode=SparseTensorQuantizationMode.RANDOM_SUBSAMPLE,
+            tensor_stride=1):
         r"""
 
         Args:
@@ -176,6 +187,11 @@ class SparseTensor():
             refer to the quantization and data loading tutorial on `here
             <https://stanfordvl.github.io/MinkowskiEngine/demo/training.html>`_
             for more details.
+
+            :attr:`quantizatino_mode`
+            (:attr:`MinkowskiEngine.SparseTensorQuantizationMode`): Defines the
+            quantization method and how to define features of a sparse tensor.
+            Please refer to :attr:`SparseTensorOperationMode` for details.
 
             :attr:`tensor_stride` (:attr:`int`, :attr:`list`,
             :attr:`numpy.array`, or :attr:`tensor.Tensor`): The tensor stride

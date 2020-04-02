@@ -302,12 +302,12 @@ uint64_t CoordsManager::initializeCoords(at::Tensor coords, at::Tensor mapping,
   // Create the concurrent coords map
   int *p_coords = coords.data<int>();
   CoordsMap coords_map;
-  auto map_batch_pair =
-      coords_map.initialize_batch(p_coords, nrows, ncols, force_remap);
+  auto map_inverse_map_batch =
+      coords_map.initialize_batch_with_inverse(p_coords, nrows, ncols);
 
   // initialize the batch indices
   if (!is_batch_indices_set) {
-    batch_indices = map_batch_pair.second;
+    batch_indices = std::get<2>(map_inverse_map_batch);
     vec_batch_indices = vector<int>(batch_indices.begin(), batch_indices.end());
     is_batch_indices_set = true;
   }
@@ -326,7 +326,7 @@ uint64_t CoordsManager::initializeCoords(at::Tensor coords, at::Tensor mapping,
   if (force_remap) {
     ASSERT(mapping.dtype() == torch::kInt64,
            "Mapping must be a torch::LongTensor");
-    const vector<int> &map = map_batch_pair.first;
+    const vector<int> &map = std::get<0>(map_inverse_map_batch);
     mapping.resize_({(long)map.size()});
     copy(map.begin(), map.end(), mapping.data<long>());
   }
