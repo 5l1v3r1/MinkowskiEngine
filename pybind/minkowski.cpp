@@ -213,8 +213,9 @@ void instantiate_coordsman(py::module &m) {
       .def("getRowIndicesPerBatch", &mink::CoordsManager::getRowIndicesPerBatch)
       .def("setOriginCoordsKey", &mink::CoordsManager::setOriginCoordsKey)
       .def("initializeCoords",
-           (uint64_t(mink::CoordsManager::*)(at::Tensor, at::Tensor, py::object,
-                                             bool, bool, bool)) &
+           (uint64_t(mink::CoordsManager::*)(at::Tensor, at::Tensor, at::Tensor,
+                                             py::object, const bool, const bool,
+                                             const bool, const bool)) &
                mink::CoordsManager::initializeCoords,
            py::call_guard<py::gil_scoped_release>())
       .def("createStridedCoords", &mink::CoordsManager::createStridedCoords)

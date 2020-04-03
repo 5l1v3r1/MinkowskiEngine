@@ -271,9 +271,12 @@ void CoordsManager::setOriginCoordsKey(py::object py_coords_key) {
  * coordinates
  */
 uint64_t CoordsManager::initializeCoords(at::Tensor coords, at::Tensor mapping,
+                                         at::Tensor inverse_mapping,
                                          const vector<int> &tensor_strides,
-                                         bool force_creation, bool force_remap,
-                                         bool allow_duplicate_coords) {
+                                         const bool force_creation,
+                                         const bool force_remap,
+                                         const bool allow_duplicate_coords,
+                                         const bool return_inverse) {
   const int nrows = coords.size(0);
   const int ncols = coords.size(1);
   const int D = ncols - 1;
@@ -301,11 +304,11 @@ uint64_t CoordsManager::initializeCoords(at::Tensor coords, at::Tensor mapping,
 
   // Create the concurrent coords map
   int *p_coords = coords.data<int>();
+  tuple<vector<int>, vector<int>, set<int>> map_inverse_map_batch;
   CoordsMap coords_map;
-  auto map_inverse_map_batch =
-      coords_map.initialize_batch_with_inverse(p_coords, nrows, ncols);
+  map_inverse_map_batch = coords_map.initialize_batch(
+      p_coords, nrows, ncols, force_remap, return_inverse);
 
-  // initialize the batch indices
   if (!is_batch_indices_set) {
     batch_indices = std::get<2>(map_inverse_map_batch);
     vec_batch_indices = vector<int>(batch_indices.begin(), batch_indices.end());
@@ -323,12 +326,20 @@ uint64_t CoordsManager::initializeCoords(at::Tensor coords, at::Tensor mapping,
   }
 
   // When remapping, return the mapping to pytorch.
-  if (force_remap) {
+  if (force_remap || return_inverse) {
     ASSERT(mapping.dtype() == torch::kInt64,
            "Mapping must be a torch::LongTensor");
     const vector<int> &map = std::get<0>(map_inverse_map_batch);
     mapping.resize_({(long)map.size()});
     copy(map.begin(), map.end(), mapping.data<long>());
+  }
+
+  if (return_inverse) {
+    ASSERT(inverse_mapping.dtype() == torch::kInt64,
+           "Inverse Mapping must be a torch::LongTensor");
+    const vector<int> &inv_map = std::get<1>(map_inverse_map_batch);
+    inverse_mapping.resize_({(long)inv_map.size()});
+    copy(inv_map.begin(), inv_map.end(), inverse_mapping.data<long>());
   }
 
   // Save the returned results
@@ -337,15 +348,15 @@ uint64_t CoordsManager::initializeCoords(at::Tensor coords, at::Tensor mapping,
   return key;
 }
 
-uint64_t CoordsManager::initializeCoords(at::Tensor coords, at::Tensor mapping,
-                                         py::object py_coords_key,
-                                         bool force_creation, bool force_remap,
-                                         bool allow_duplicate_coords) {
+uint64_t CoordsManager::initializeCoords(
+    at::Tensor coords, at::Tensor mapping, at::Tensor inverse_mapping,
+    py::object py_coords_key, const bool force_creation, const bool force_remap,
+    const bool allow_duplicate_coords, const bool return_inverse) {
   CoordsKey *p_coords_key = py_coords_key.cast<CoordsKey *>();
 
-  const uint64_t in_coords_key =
-      initializeCoords(coords, mapping, p_coords_key->getTensorStride(),
-                       force_creation, force_remap, allow_duplicate_coords);
+  const uint64_t in_coords_key = initializeCoords(
+      coords, mapping, inverse_mapping, p_coords_key->getTensorStride(),
+      force_creation, force_remap, allow_duplicate_coords, return_inverse);
 
   // Tensor strides initialized on the python side.
   p_coords_key->setKey(in_coords_key);
@@ -888,12 +899,14 @@ CoordsManager::getRowIndicesAtBatchIndex(py::object py_in_coords_key,
 
   // Return an empty list if not found.
   if (batch_iter == vec_batch_indices.end()) {
-    at::Tensor in_rows = torch::zeros({0}, torch::TensorOptions().dtype(torch::kInt64));
+    at::Tensor in_rows =
+        torch::zeros({0}, torch::TensorOptions().dtype(torch::kInt64));
     return in_rows;
 
   } else {
 
-    const auto in_outs = getOriginInOutMaps(py_in_coords_key, py_out_coords_key);
+    const auto in_outs =
+        getOriginInOutMaps(py_in_coords_key, py_out_coords_key);
     const auto &in = in_outs.first[*batch_iter];
 
     at::Tensor in_rows = torch::zeros(

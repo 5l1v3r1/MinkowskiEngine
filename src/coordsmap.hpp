@@ -87,14 +87,10 @@ public:
   vector<int> initialize(const int *p_coords_, const int nrows_,
                          const int ncols_, const bool force_remap = false);
 
-  pair<vector<int>, set<int>> initialize_batch(const int *p_coords_,
-                                               const int nrows_,
-                                               const int ncols_,
-                                               const bool force_remap = false);
-
   tuple<vector<int>, vector<int>, set<int>>
-  initialize_batch_with_inverse(const int *p_coords_, const int nrows_,
-                                const int ncols_);
+  initialize_batch(const int *p_coords_, const int nrows_, const int ncols_,
+                   const bool force_remap = false,
+                   const bool return_inverse = false);
 
   // Generate strided version of the input coordinate map.
   // returns mapping: out_coord row index to in_coord row index

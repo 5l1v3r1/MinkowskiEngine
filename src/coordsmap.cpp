@@ -72,45 +72,10 @@ vector<int> CoordsMap::initialize(const int *p_coords, const int nrows_,
   return mapping;
 }
 
-pair<vector<int>, set<int>>
-CoordsMap::initialize_batch(const int *p_coords, const int nrows_,
-                            const int ncols_, const bool force_remap) {
-  nrows = nrows_;
-  ncols = ncols_;
-
-  vector<int> mapping;
-  set<int> batch_indices;
-
-  mapping.reserve(nrows);
-  map.reserve(nrows);
-
-  int c = 0;
-  for (int i = 0; i < nrows; i++) {
-    vector<int> coord(ncols);
-    std::copy_n(p_coords + i * ncols, ncols, coord.data());
-
-    if (map.find(coord) == map.end()) {
-#ifdef BATCH_FIRST
-      batch_indices.insert(coord[0]);
-#else
-      batch_indices.insert(coord[ncols - 1]);
-#endif
-      mapping.push_back(i);
-
-      map[move(coord)] = force_remap ? c++ : i;
-    }
-  }
-
-  return make_pair(mapping, batch_indices);
-}
-
-// index, inverse_index = initialize_with_inverse(coords)
-// unique_coords = coords[index]
-// coords == unique_coords[inverse_index]
-// coords == coords[index[inverse_index]]
 tuple<vector<int>, vector<int>, set<int>>
-CoordsMap::initialize_batch_with_inverse(const int *p_coords, const int nrows_,
-                                         const int ncols_) {
+CoordsMap::initialize_batch(const int *p_coords, const int nrows_,
+                            const int ncols_, const bool force_remap,
+                            const bool return_inverse) {
   nrows = nrows_;
   ncols = ncols_;
 
@@ -118,31 +83,53 @@ CoordsMap::initialize_batch_with_inverse(const int *p_coords, const int nrows_,
   set<int> batch_indices;
 
   mapping.reserve(nrows);
-  inverse_mapping.reserve(nrows);
+  map.reserve(nrows);
 
-  int c = 0;
-  for (int i = 0; i < nrows; i++) {
-    vector<int> coord(ncols);
-    std::copy_n(p_coords + i * ncols, ncols, coord.data());
+  // index, inverse_index = initialize_with_inverse(coords)
+  // unique_coords = coords[index]
+  // coords == unique_coords[inverse_index]
+  // coords == coords[index[inverse_index]]
+  if (return_inverse) {
+    inverse_mapping.reserve(nrows);
+    int c = 0;
+    for (int i = 0; i < nrows; i++) {
+      vector<int> coord(ncols);
+      std::copy_n(p_coords + i * ncols, ncols, coord.data());
 
-    auto iter = map.find(coord);
-    if (iter == map.end()) {
-      mapping.push_back(i);
-      inverse_mapping.push_back(c);
-
+      auto iter = map.find(coord);
+      if (iter == map.end()) {
+        mapping.push_back(i);
+        inverse_mapping.push_back(c);
 #ifdef BATCH_FIRST
-      batch_indices.insert(coord[0]);
+        batch_indices.insert(coord[0]);
 #else
-      batch_indices.insert(coord[ncols - 1]);
+        batch_indices.insert(coord[ncols - 1]);
 #endif
-      map[move(coord)] = c++;
-    } else {
-      inverse_mapping.push_back(iter->second);
+        map[move(coord)] = c++;
+      } else {
+        inverse_mapping.push_back(iter->second);
+      }
+    }
+  } else {
+    int c = 0;
+    for (int i = 0; i < nrows; i++) {
+      vector<int> coord(ncols);
+      std::copy_n(p_coords + i * ncols, ncols, coord.data());
+
+      if (map.find(coord) == map.end()) {
+#ifdef BATCH_FIRST
+        batch_indices.insert(coord[0]);
+#else
+        batch_indices.insert(coord[ncols - 1]);
+#endif
+        mapping.push_back(i);
+
+        map[move(coord)] = force_remap ? c++ : i;
+      }
     }
   }
 
-  return std::make_tuple(move(mapping), move(inverse_mapping),
-                         move(batch_indices));
+  return make_tuple(mapping, inverse_mapping, batch_indices);
 }
 
 CoordsMap CoordsMap::stride(const vector<int> &tensor_strides) const {

@@ -27,7 +27,6 @@ import torch
 import numpy as np
 
 from MinkowskiEngine import CoordsKey, CoordsManager
-from MinkowskiEngine.utils import get_coords_map
 
 from tests.common import data_loader
 
@@ -65,7 +64,7 @@ class Test(unittest.TestCase):
         print('Num unique: ', unique_coords.shape)
 
         # Initialize map
-        mapping = cm.initialize(
+        mapping, inverse_mapping = cm.initialize(
             coords, key, force_remap=True, allow_duplicate_coords=False)
         print(mapping, len(mapping))
         cm.print_diagnostics(key)
@@ -106,7 +105,7 @@ class Test(unittest.TestCase):
 
         # Initialize map
         cm = CoordsManager(D=2)
-        mapping = cm.initialize(
+        mapping, inverse_mapping = cm.initialize(
             coords, key, force_remap=True, allow_duplicate_coords=False)
         print(mapping, len(mapping))
         cm.print_diagnostics(key)
@@ -124,7 +123,7 @@ class Test(unittest.TestCase):
         inc = cm.get_coords(1)
         outc = cm.get_coords(2)
         for i, o in zip(ins, outs):
-          print(f"{i}: ({inc[i]}) -> {o}: ({outc[o]})")
+            print(f"{i}: ({inc[i]}) -> {o}: ({outc[o]})")
 
     def test_negative_coords(self):
         print('Negative coords test')
@@ -132,10 +131,11 @@ class Test(unittest.TestCase):
         key.setTensorStride(1)
 
         cm = CoordsManager(D=1)
-        coords = torch.IntTensor([[0, -3], [0, -2], [0, -1], [0, 0], [0, 1], [0, 2], [0, 3]])
+        coords = torch.IntTensor([[0, -3], [0, -2], [0, -1], [0, 0], [0, 1],
+                                  [0, 2], [0, 3]])
 
         # Initialize map
-        mapping = cm.initialize(coords, key)
+        mapping, inverse_mapping = cm.initialize(coords, key)
         print(mapping, len(mapping))
         cm.print_diagnostics(key)
 
@@ -153,13 +153,15 @@ class Test(unittest.TestCase):
 
     def test_batch_size_initialize(self):
         cm = CoordsManager(D=1)
-        coords = torch.IntTensor([[0, -3], [0, -2], [0, -1], [0, 0], [1, 1], [1, 2], [1, 3]])
+        coords = torch.IntTensor([[0, -3], [0, -2], [0, -1], [0, 0], [1, 1],
+                                  [1, 2], [1, 3]])
 
         # key with batch_size 2
         cm.create_coords_key(coords)
         self.assertTrue(cm.get_batch_size() == 2)
 
-        coords = torch.IntTensor([[0, -3], [0, -2], [0, -1], [0, 0], [0, 1], [0, 2], [0, 3]])
+        coords = torch.IntTensor([[0, -3], [0, -2], [0, -1], [0, 0], [0, 1],
+                                  [0, 2], [0, 3]])
         cm.create_coords_key(coords)
 
         self.assertTrue(cm.get_batch_size() == 2)

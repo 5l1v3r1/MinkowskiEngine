@@ -58,7 +58,7 @@ vector<py::array> quantize_np(
 
   // Create coords map
   CoordsMap map;
-  auto results = map.initialize_batch_with_inverse(p_coords, nrows, ncols);
+  auto results = map.initialize_batch(p_coords, nrows, ncols, true, true);
   auto &mapping = std::get<0>(results);
   auto &inverse_mapping = std::get<1>(results);
 
@@ -88,8 +88,8 @@ vector<at::Tensor> quantize_th(at::Tensor coords) {
          coords.dim(), "!= 2.");
 
   CoordsMap map;
-  auto results = map.initialize_batch_with_inverse(
-      coords.data<int>(), coords.size(0), coords.size(1));
+  auto results = map.initialize_batch(coords.data<int>(), coords.size(0),
+                                      coords.size(1), true, true);
   auto mapping = std::get<0>(results);
   auto inverse_mapping = std::get<1>(results);
 

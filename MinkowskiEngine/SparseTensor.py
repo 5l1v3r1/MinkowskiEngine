@@ -251,13 +251,19 @@ class SparseTensor():
                 coords_manager = CoordsManager(D=coords.size(1) - 1)
 
             if not coords_key.isKeySet():
-                self.mapping = coords_manager.initialize(
+                return_inverse = False
+                force_remap = True  # Not necessary but might be obvious for users to know that the engine is using the generated subset
+
+                self.mapping, self.inverse_mapping = coords_manager.initialize(
                     coords,
                     coords_key,
                     force_creation=force_creation,
-                    force_remap=allow_duplicate_coords,
-                    allow_duplicate_coords=allow_duplicate_coords)
-                if len(self.mapping) > 0:
+                    force_remap=force_remap,
+                    allow_duplicate_coords=allow_duplicate_coords,
+                    return_inverse=return_inverse)
+
+                if force_remap:
+                    assert len(self.mapping) > 0
                     coords = coords[self.mapping]
                     feats = feats[self.mapping]
         else:
@@ -265,12 +271,14 @@ class SparseTensor():
 
             if not coords_key.isKeySet():
                 assert coords is not None
-                self.mapping = coords_manager.initialize(
+                return_inverse = False
+                self.mapping, self.inverse_mapping = coords_manager.initialize(
                     coords,
                     coords_key,
                     force_creation=force_creation,
                     force_remap=allow_duplicate_coords,
-                    allow_duplicate_coords=allow_duplicate_coords)
+                    allow_duplicate_coords=allow_duplicate_coords,
+                    return_inverse=return_inverse)
                 if len(self.mapping) > 0:
                     coords = coords[self.mapping]
                     feats = feats[self.mapping]
