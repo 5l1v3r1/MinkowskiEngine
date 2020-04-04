@@ -30,7 +30,8 @@
 
 namespace minkowski {
 
-CoordsMap::CoordsMap(int ncols_, const set<int> &batch_indices)
+template <typename MapType>
+CoordsMap<MapType>::CoordsMap(int ncols_, const set<int> &batch_indices)
     : nrows(batch_indices.size()), ncols(ncols_) {
   int c = 0;
   map.reserve(nrows);
@@ -48,8 +49,10 @@ CoordsMap::CoordsMap(int ncols_, const set<int> &batch_indices)
   }
 }
 
-vector<int> CoordsMap::initialize(const int *p_coords, const int nrows_,
-                                  const int ncols_, const bool force_remap) {
+template <typename MapType>
+vector<int> CoordsMap<MapType>::initialize(const int *p_coords,
+                                           const int nrows_, const int ncols_,
+                                           const bool force_remap) {
   nrows = nrows_;
   ncols = ncols_;
 
@@ -72,10 +75,11 @@ vector<int> CoordsMap::initialize(const int *p_coords, const int nrows_,
   return mapping;
 }
 
+template <typename MapType>
 tuple<vector<int>, vector<int>, set<int>>
-CoordsMap::initialize_batch(const int *p_coords, const int nrows_,
-                            const int ncols_, const bool force_remap,
-                            const bool return_inverse) {
+CoordsMap<MapType>::initialize_batch(const int *p_coords, const int nrows_,
+                                     const int ncols_, const bool force_remap,
+                                     const bool return_inverse) {
   nrows = nrows_;
   ncols = ncols_;
 
@@ -132,10 +136,12 @@ CoordsMap::initialize_batch(const int *p_coords, const int nrows_,
   return make_tuple(mapping, inverse_mapping, batch_indices);
 }
 
-CoordsMap CoordsMap::stride(const vector<int> &tensor_strides) const {
+template <typename MapType>
+CoordsMap<MapType>
+CoordsMap<MapType>::stride(const vector<int> &tensor_strides) const {
   ASSERT(tensor_strides.size() == ncols - 1, "Invalid tensor strides");
 
-  CoordsMap stride_map;
+  CoordsMap<MapType> stride_map;
   stride_map.reserve(nrows);
 
   int c = 0;
@@ -151,10 +157,12 @@ CoordsMap CoordsMap::stride(const vector<int> &tensor_strides) const {
   return stride_map;
 }
 
-CoordsMap CoordsMap::stride_region(const Region &region) const {
+template <typename MapType>
+CoordsMap<MapType>
+CoordsMap<MapType>::stride_region(const Region &region) const {
   ASSERT(region.tensor_strides.size() == ncols - 1, "Invalid tensor strides");
 
-  CoordsMap stride_map;
+  CoordsMap<MapType> stride_map;
   const int K = region.size();
   stride_map.reserve(nrows * K);
 
@@ -174,9 +182,10 @@ CoordsMap CoordsMap::stride_region(const Region &region) const {
   return stride_map;
 };
 
-CoordsMap CoordsMap::prune(const bool *p_keep, int n) const {
+template <typename MapType>
+CoordsMap<MapType> CoordsMap<MapType>::prune(const bool *p_keep, int n) const {
   int c = 0;
-  CoordsMap pruned_map;
+  CoordsMap<MapType> pruned_map;
   pruned_map.reserve(nrows);
 
   for (const auto &kv : map) {
@@ -190,21 +199,25 @@ CoordsMap CoordsMap::prune(const bool *p_keep, int n) const {
   return pruned_map;
 }
 
-CoordsMap
-CoordsMap::union_coords(const vector<reference_wrapper<CoordsMap>> &maps) {
-  const size_t num_tot = std::accumulate(
-      maps.begin(), maps.end(), 0,
-      [](size_t count, const CoordsMap &it) { return count + it.size(); });
+template <typename MapType>
+CoordsMap<MapType> CoordsMap<MapType>::union_coords(
+    const vector<reference_wrapper<CoordsMap<MapType>>> &maps) {
+  const size_t num_tot =
+      std::accumulate(maps.begin(), maps.end(), 0,
+                      [](size_t count, const CoordsMap<MapType> &it) {
+                        return count + it.size();
+                      });
 
   const auto max_iter = std::max_element(
-      maps.begin(), maps.end(), [](const CoordsMap &a, const CoordsMap &b) {
+      maps.begin(), maps.end(),
+      [](const CoordsMap<MapType> &a, const CoordsMap<MapType> &b) {
         return a.size() < b.size();
       });
   const auto max_index = std::distance(maps.begin(), max_iter);
 
   // Initialize with the largest coords map.
-  const CoordsMap &max_map = maps[max_index];
-  CoordsMap out_map(max_map);
+  const CoordsMap<MapType> &max_map = maps[max_index];
+  CoordsMap<MapType> out_map(max_map);
   out_map.reserve(num_tot);
   size_t c = max_map.size();
   for (size_t i = 0; i < maps.size(); ++i) {
@@ -212,7 +225,7 @@ CoordsMap::union_coords(const vector<reference_wrapper<CoordsMap>> &maps) {
     if (i == max_index)
       continue;
 
-    const CoordsMap &map = maps[i];
+    const CoordsMap<MapType> &map = maps[i];
     for (const auto &kv : map) {
       if (out_map.find(kv.first) == out_map.end()) {
         out_map[kv.first] = c++;
@@ -226,8 +239,10 @@ CoordsMap::union_coords(const vector<reference_wrapper<CoordsMap>> &maps) {
   return out_map;
 }
 
-InOutMapsPair<int> CoordsMap::kernel_map(const CoordsMap &out_coords_map,
-                                         const Region &region) const {
+template <typename MapType>
+InOutMapsPair<int>
+CoordsMap<MapType>::kernel_map(const CoordsMap<MapType> &out_coords_map,
+                               const Region &region) const {
   const int K = region.size();
   const int num_out = out_coords_map.size();
 
@@ -317,8 +332,9 @@ InOutMapsPair<int> CoordsMap::kernel_map(const CoordsMap &out_coords_map,
   return make_pair(move(in_maps), move(out_maps));
 }
 
-InOutMapsPair<int>
-CoordsMap::pruned_kernel_map(const CoordsMap &out_coords_map) const {
+template <typename MapType>
+InOutMapsPair<int> CoordsMap<MapType>::pruned_kernel_map(
+    const CoordsMap<MapType> &out_coords_map) const {
   InOutMaps<int> in_maps(1);
   InOutMaps<int> out_maps(1);
 
@@ -335,9 +351,9 @@ CoordsMap::pruned_kernel_map(const CoordsMap &out_coords_map) const {
   return make_pair(move(in_maps), move(out_maps));
 }
 
-InOutMapsPair<int>
-CoordsMap::global_reduction_map(const CoordsMap &gout_coords_map,
-                                bool return_per_batch) const {
+template <typename MapType>
+InOutMapsPair<int> CoordsMap<MapType>::global_reduction_map(
+    const CoordsMap<MapType> &gout_coords_map, bool return_per_batch) const {
 #ifdef BATCH_FIRST
   constexpr int batch_index = 0;
 #else
@@ -390,9 +406,10 @@ CoordsMap::global_reduction_map(const CoordsMap &gout_coords_map,
   }
 }
 
+template <typename MapType>
 InOutMapsPair<int>
-CoordsMap::stride_map(const CoordsMap &out_coords_map,
-                      const vector<int> &tensor_strides) const {
+CoordsMap<MapType>::stride_map(const CoordsMap<MapType> &out_coords_map,
+                               const vector<int> &tensor_strides) const {
   InOutMaps<int> in_maps(1);
   InOutMaps<int> out_maps(1);
 
@@ -412,9 +429,10 @@ CoordsMap::stride_map(const CoordsMap &out_coords_map,
   return make_pair(move(in_maps), move(out_maps));
 }
 
-InOutMapsPair<int>
-CoordsMap::union_map(const vector<reference_wrapper<CoordsMap>> &in_maps,
-                     const CoordsMap &out_map) {
+template <typename MapType>
+InOutMapsPair<int> CoordsMap<MapType>::union_map(
+    const vector<reference_wrapper<CoordsMap<MapType>>> &in_maps,
+    const CoordsMap<MapType> &out_map) {
   const size_t num_in_maps = in_maps.size();
   InOutMaps<int> ins(num_in_maps);
   InOutMaps<int> outs(num_in_maps);
@@ -426,7 +444,7 @@ CoordsMap::union_map(const vector<reference_wrapper<CoordsMap>> &in_maps,
 
 #pragma omp parallel for
   for (size_t n = 0; n < num_in_maps; n++) {
-    for (const auto &kv : (const CoordsMap &)in_maps[n]) {
+    for (const auto &kv : (const CoordsMap<MapType> &)in_maps[n]) {
       auto out_iter = out_map.find(kv.first);
       ASSERT(out_iter != out_map.end(), "Invalid out_map.");
       ins[n].push_back(kv.second);
@@ -437,11 +455,14 @@ CoordsMap::union_map(const vector<reference_wrapper<CoordsMap>> &in_maps,
   return make_pair(move(ins), move(outs));
 }
 
-void CoordsMap::print() const {
+template <typename MapType> void CoordsMap<MapType>::print() const {
   for (const auto &kv : map) {
     std::cout << ArrToString(kv.first) << ":" << kv.second << "\n";
   }
   std::cout << std::flush;
 }
+
+template class CoordsMap<CoordsToIndexMap>;
+// template class CoordsMap<CoordsToVectorMap>;
 
 } // end namespace minkowski

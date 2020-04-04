@@ -161,8 +161,8 @@ class SparseTensor():
             :attr:`coords_key` (:attr:`MinkowskiEngine.CoordsKey`): When the
             coordinates are already cached in the MinkowskiEngine, we could
             reuse the same coordinates by simply providing the coordinate hash
-            key. In most case, this process is done automatically. If you
-            provide one, make sure you understand what you are doing.
+            key. In most case, this process is done automatically. When you
+            provide a `coords_key`, all other arguments will be be ignored.
 
             :attr:`coords_manager` (:attr:`MinkowskiEngine.CoordsManager`): The
             MinkowskiEngine creates a dynamic computation graph and all
@@ -239,6 +239,9 @@ class SparseTensor():
 
             coords = coords.contiguous()
 
+        ##########################
+        # Setup CoordsManager
+        ##########################
         if coords_manager is None:
             # If set to share the coords man, use the global coords man
             global _sparse_tensor_operation_mode, _global_coords_man
@@ -250,38 +253,41 @@ class SparseTensor():
                 assert coords is not None, "Initial coordinates must be given"
                 coords_manager = CoordsManager(D=coords.size(1) - 1)
 
-            if not coords_key.isKeySet():
-                return_inverse = False
-                force_remap = True  # Not necessary but might be obvious for users to know that the engine is using the generated subset
-
-                self.mapping, self.inverse_mapping = coords_manager.initialize(
-                    coords,
-                    coords_key,
-                    force_creation=force_creation,
-                    force_remap=force_remap,
-                    allow_duplicate_coords=allow_duplicate_coords,
-                    return_inverse=return_inverse)
-
-                if force_remap:
-                    assert len(self.mapping) > 0
-                    coords = coords[self.mapping]
-                    feats = feats[self.mapping]
         else:
             assert isinstance(coords_manager, CoordsManager)
 
-            if not coords_key.isKeySet():
-                assert coords is not None
+        ##########################
+        # Initialize coords
+        ##########################
+        if not coords_key.isKeySet():
+            assert coords is not None
+            assert isinstance(quantization_mode, SparseTensorQuantizationMode)
+
+            if quantization_mode == SparseTensorQuantizationMode.RANDOM_SUBSAMPLE:
+                force_remap = True
                 return_inverse = False
-                self.mapping, self.inverse_mapping = coords_manager.initialize(
-                    coords,
-                    coords_key,
-                    force_creation=force_creation,
-                    force_remap=allow_duplicate_coords,
-                    allow_duplicate_coords=allow_duplicate_coords,
-                    return_inverse=return_inverse)
-                if len(self.mapping) > 0:
-                    coords = coords[self.mapping]
-                    feats = feats[self.mapping]
+            elif quantization_mode == SparseTensorQuantizationMode.UNWEIGHTED_AVERAGE:
+                force_remap = True
+                return_inverse = True
+
+            self.unique_index, self.inverse_mapping = coords_manager.initialize(
+                coords,
+                coords_key,
+                force_creation=force_creation,
+                force_remap=force_remap,
+                allow_duplicate_coords=allow_duplicate_coords,
+                return_inverse=return_inverse)
+
+            if quantization_mode == SparseTensorQuantizationMode.UNWEIGHTED_AVERAGE:
+                # Average features
+                pass
+
+            if force_remap:
+                assert len(self.unique_index) > 0
+                self._CC = coords
+                self._CF = feats
+                coords = coords[self.unique_index]
+                feats = feats[self.unique_index]
 
         self._F = feats.contiguous()
         self._C = coords

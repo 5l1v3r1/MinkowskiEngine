@@ -86,13 +86,13 @@ class CoordsManager():
                    allow_duplicate_coords: bool = False,
                    return_inverse: bool = False) -> torch.LongTensor:
         assert isinstance(coords_key, CoordsKey)
-        mapping = torch.LongTensor()
+        unique_index = torch.LongTensor()
         inverse_mapping = torch.LongTensor()
-        self.CPPCoordsManager.initializeCoords(coords, mapping, inverse_mapping,
+        self.CPPCoordsManager.initializeCoords(coords, unique_index, inverse_mapping,
                                                coords_key.CPPCoordsKey,
                                                force_creation, force_remap,
                                                allow_duplicate_coords, return_inverse)
-        return mapping, inverse_mapping
+        return unique_index, inverse_mapping
 
     def create_coords_key(self,
                           coords: torch.IntTensor,
@@ -102,7 +102,7 @@ class CoordsManager():
                           allow_duplicate_coords: bool = False) -> CoordsKey:
         coords_key = CoordsKey(self.D)
         coords_key.setTensorStride(tensor_stride)
-        mapping, inverse_mapping = self.initialize(
+        unique_index, inverse_mapping = self.initialize(
             coords,
             coords_key,
             force_creation=True,

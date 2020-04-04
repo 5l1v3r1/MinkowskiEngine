@@ -31,6 +31,7 @@
 #include <tuple>
 
 #include "3rdparty/robin_hood.h"
+#include "primitives/small_vector.hpp"
 
 #include "region.hpp"
 #include "types.hpp"
@@ -68,12 +69,15 @@ inline vector<int> stride_copy(const vector<Itype> &src,
   return dst;
 }
 
-using CoordsInnerMap =
+using CoordsToIndexMap =
     robin_hood::unordered_flat_map<vector<int>, int, byte_hash_vec<int>>;
+using CoordsToVectorMap =
+    robin_hood::unordered_flat_map<vector<int>, small_vector<int, 4>,
+                                   byte_hash_vec<int>>;
 
-class CoordsMap {
+template <typename MapType = CoordsToIndexMap> class CoordsMap {
 private:
-  CoordsInnerMap map;
+  MapType map;
 
 public:
   int nrows, ncols;
@@ -115,14 +119,12 @@ public:
             const CoordsMap &out_map);
 
   // Iterators
-  CoordsInnerMap::iterator begin() { return map.begin(); }
-  CoordsInnerMap::const_iterator begin() const { return map.begin(); }
-  CoordsInnerMap::iterator end() { return map.end(); }
-  CoordsInnerMap::const_iterator end() const { return map.end(); }
-  CoordsInnerMap::iterator find(const vector<int> &key) {
-    return map.find(key);
-  }
-  CoordsInnerMap::const_iterator find(const vector<int> &key) const {
+  typename MapType::iterator begin() { return map.begin(); }
+  typename MapType::const_iterator begin() const { return map.begin(); }
+  typename MapType::iterator end() { return map.end(); }
+  typename MapType::const_iterator end() const { return map.end(); }
+  typename MapType::iterator find(const vector<int> &key) { return map.find(key); }
+  typename MapType::const_iterator find(const vector<int> &key) const {
     return map.find(key);
   }
 

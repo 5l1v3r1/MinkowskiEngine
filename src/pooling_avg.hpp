@@ -137,6 +137,24 @@ void NonzeroAvgPoolingBackwardKernelCPU(
   }
 }
 
+template void NonzeroAvgPoolingForwardKernelCPU<float, int>(
+    const float *p_in_feat, float *p_out_feat, float *p_num_nonzero,
+    int nchannel, const InOutMaps<int> &in_map, const InOutMaps<int> &out_map,
+    int out_nrows, const bool use_avg);
+
+template void NonzeroAvgPoolingForwardKernelCPU<float, long>(
+    const float *p_in_feat, float *p_out_feat, float *p_num_nonzero,
+    int nchannel, const InOutMaps<long> &in_map, const InOutMaps<long> &out_map,
+    int out_nrows, const bool use_avg);
+template void NonzeroAvgPoolingForwardKernelCPU<double, int>(
+    const double *p_in_feat, double *p_out_feat, double *p_num_nonzero,
+    int nchannel, const InOutMaps<int> &in_map, const InOutMaps<int> &out_map,
+    int out_nrows, const bool use_avg);
+
+template void NonzeroAvgPoolingForwardKernelCPU<double, long>(
+    const double *p_in_feat, double *p_out_feat, double *p_num_nonzero,
+    int nchannel, const InOutMaps<long> &in_map, const InOutMaps<long> &out_map,
+    int out_nrows, const bool use_avg);
 } // namespace minkowski
 
 #endif // end CPU_POOLING_AVG

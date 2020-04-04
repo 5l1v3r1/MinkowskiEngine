@@ -106,12 +106,12 @@ inline vector<int> computeOutTensorStride(const vector<int> &tensor_strides,
   return out_tensor_strides;
 }
 
-class CoordsManager {
+template <typename MapType = CoordsToIndexMap> class CoordsManager {
 public:
   // Variables
   //
   // Coordinate hash key to coordinate hash map
-  unordered_map<uint64_t, CoordsMap> coords_maps;
+  unordered_map<uint64_t, CoordsMap<MapType>> coords_maps;
 
   // Track whether the batch indices are set
   bool is_batch_indices_set = false;

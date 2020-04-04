@@ -45,6 +45,7 @@ struct IndexLabel {
 using CoordsLabelMap =
     robin_hood::unordered_flat_map<vector<int>, IndexLabel, byte_hash_vec<int>>;
 
+template <typename MapType>
 vector<py::array> quantize_np(
     py::array_t<int, py::array::c_style | py::array::forcecast> coords) {
   py::buffer_info coords_info = coords.request();
@@ -57,7 +58,7 @@ vector<py::array> quantize_np(
   int nrows = shape[0], ncols = shape[1];
 
   // Create coords map
-  CoordsMap map;
+  CoordsMap<MapType> map;
   auto results = map.initialize_batch(p_coords, nrows, ncols, true, true);
   auto &mapping = std::get<0>(results);
   auto &inverse_mapping = std::get<1>(results);
@@ -80,16 +81,16 @@ vector<py::array> quantize_np(
   return {py_mapping, py_inverse_mapping};
 }
 
-vector<at::Tensor> quantize_th(at::Tensor coords) {
+template <typename MapType> vector<at::Tensor> quantize_th(at::Tensor coords) {
   ASSERT(coords.dtype() == torch::kInt32,
          "Coordinates must be an int type tensor.");
   ASSERT(coords.dim() == 2,
          "Coordinates must be represnted as a matrix. Dimensions: ",
          coords.dim(), "!= 2.");
 
-  CoordsMap map;
-  auto results = map.initialize_batch(coords.data<int>(), coords.size(0),
-                                      coords.size(1), true, true);
+  CoordsMap<MapType> map;
+  auto results = map.initialize_batch(
+      coords.template data<int>(), coords.size(0), coords.size(1), true, true);
   auto mapping = std::get<0>(results);
   auto inverse_mapping = std::get<1>(results);
 
@@ -174,8 +175,8 @@ vector<at::Tensor> quantize_label_th(at::Tensor coords, at::Tensor labels,
   ASSERT(coords.size(0) == labels.size(0),
          "Coords nrows must be equal to label size.");
 
-  int *p_coords = coords.data<int>();
-  int *p_labels = labels.data<int>();
+  int *p_coords = coords.template data<int>();
+  int *p_labels = labels.template data<int>();
   int nrows = coords.size(0), ncols = coords.size(1);
 
   // Create coords map
@@ -211,5 +212,37 @@ vector<at::Tensor> quantize_label_th(at::Tensor coords, at::Tensor labels,
 
   return {th_mapping, th_colabels};
 }
+
+template vector<py::array> quantize_np<CoordsToIndexMap>(
+    py::array_t<int, py::array::c_style | py::array::forcecast> coords);
+
+template vector<at::Tensor> quantize_th<CoordsToIndexMap>(at::Tensor coords);
+
+// in_feat[in_map[i], j] --> out_feat[out_map[i], j]
+/*
+at::Tensor average_features_for_quantization(at::Tensor in_feat,
+                                             at::Tensor in_map,
+                                             at::Tensor out_map, int mode) {
+  auto nrows = in_feat.size(0);
+  auto nchannel = in_feat.size(1);
+  at::Tensor out_feat = torch::zeros({nrows, nchannel}, in_feat.options());
+  if (in_map.dtype() == torch::kInt64) {
+    if (in_feat.dtype() == torch::kFloat32) {
+      at::Tensor num_nonzero =
+          torch::zeros({nrows}, torch::TensorOptions().dtype(torch::kFloat32));
+      NonzeroAvgPoolingForwardKernelCPU<float, long>(
+          in_feat.template data<float>(), out_feat.template data<float>(),
+          num_nonzero.template data<float>(), nchannel, in_map.template
+data<long>(), out_map.template data<long>(), nrows, true); } else if
+(in_feat.dtype() == torch::kFloat64) { at::Tensor num_nonzero =
+          torch::zeros({nrows}, torch::TensorOptions().dtype(torch::kFloat64));
+      NonzeroAvgPoolingForwardKernelCPU<double, long>(
+          in_feat.template data<double>(), out_feat.template data<double>(),
+          num_nonzero.template data<double>(), nchannel, in_map.data<long>(),
+          out_map.template data<long>(), nrows, true);
+    }
+  }
+}
+*/
 
 } // end namespace minkowski
